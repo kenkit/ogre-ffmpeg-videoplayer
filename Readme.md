@@ -55,3 +55,8 @@ Playback controls:
  - Space: Play/Pause
  - Left/Right: Seek by 5 seconds.
  - Down/Up: Seek by 30 seconds.
+
+TODO
+-------
+
+Get rid of ogreresource group manager and use the standard ffmpeg file access to enable all the default file input type.
