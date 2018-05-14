@@ -95,7 +95,7 @@ void PacketQueue::put(AVPacket *pkt)
     pkt1->pkt = *pkt;
     pkt1->next = NULL;
 
-    if(pkt->data != flush_pkt.data && pkt1->pkt.destruct == NULL)
+    if(pkt->data != flush_pkt.data)
     {
         if(av_dup_packet(&pkt1->pkt) < 0)
         {
@@ -314,7 +314,7 @@ int VideoState::queue_picture(AVFrame *pFrame, double pts)
         int w = (*this->video_st)->codec->width;
         int h = (*this->video_st)->codec->height;
         this->sws_context = sws_getContext(w, h, (*this->video_st)->codec->pix_fmt,
-                                           w, h, PIX_FMT_RGBA, SWS_BICUBIC,
+                                           w, h, AV_PIX_FMT_RGBA, SWS_BICUBIC,
                                            NULL, NULL, NULL);
         if(this->sws_context == NULL)
             throw std::runtime_error("Cannot initialize the conversion context!\n");
@@ -361,19 +361,7 @@ double VideoState::synchronize_video(AVFrame *src_frame, double pts)
  * a frame at the time it is allocated.
  */
 static int64_t global_video_pkt_pts = AV_NOPTS_VALUE;
-static int our_get_buffer(struct AVCodecContext *c, AVFrame *pic)
-{
-    int ret = avcodec_default_get_buffer(c, pic);
-    int64_t *pts = (int64_t*)av_malloc(sizeof(int64_t));
-    *pts = global_video_pkt_pts;
-    pic->opaque = pts;
-    return ret;
-}
-static void our_release_buffer(struct AVCodecContext *c, AVFrame *pic)
-{
-    if(pic) av_freep(&pic->opaque);
-    avcodec_default_release_buffer(c, pic);
-}
+
 
 
 void VideoState::video_thread_loop(VideoState *self)
@@ -385,7 +373,7 @@ void VideoState::video_thread_loop(VideoState *self)
     pFrame = av_frame_alloc();
 
     self->rgbaFrame = av_frame_alloc();
-    avpicture_alloc((AVPicture*)self->rgbaFrame, PIX_FMT_RGBA, (*self->video_st)->codec->width, (*self->video_st)->codec->height);
+    avpicture_alloc((AVPicture*)self->rgbaFrame, AV_PIX_FMT_RGBA, (*self->video_st)->codec->width, (*self->video_st)->codec->height);
 
     while(self->videoq.get(packet, self) >= 0)
     {
@@ -593,8 +581,6 @@ int VideoState::stream_open(int stream_index, AVFormatContext *pFormatCtx)
     case AVMEDIA_TYPE_VIDEO:
         this->video_st = pFormatCtx->streams + stream_index;
 
-        codecCtx->get_buffer = our_get_buffer;
-        codecCtx->release_buffer = our_release_buffer;
         this->video_thread = boost::thread(video_thread_loop, this);
         break;
 
